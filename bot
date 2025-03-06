@@ -1,0 +1,113 @@
+import { Client, GatewayIntentBits, SlashCommandBuilder } from 'discord.js';
+import dotenv from 'dotenv';
+import axios from 'axios';
+import crypto from 'crypto';
+
+dotenv.config();
+
+const client = new Client({
+    intents: [
+        GatewayIntentBits.Guilds,
+        GatewayIntentBits.GuildMessages,
+        GatewayIntentBits.MessageContent
+    ]
+});
+
+const allowedAdmins = new Set();
+const activationCodes = new Map();
+const activatedUsers = new Set();
+
+client.once('ready', () => {
+    console.log(`Logged in as ${client.user.tag}`);
+});
+
+client.on('interactionCreate', async (interaction) => {
+    if (!interaction.isCommand()) return;
+
+    const { commandName, options, user } = interaction;
+
+    if (!activatedUsers.has(user.id) && commandName !== 'activate') {
+        return await interaction.reply('You need to activate your account first. Use `/activate <code>`.');
+    }
+
+    if (commandName === 'allowed_admins') {
+        const subcommand = options.getSubcommand();
+        const gamertag = options.getString('gamertag');
+        
+        if (subcommand === 'add') {
+            allowedAdmins.add(gamertag);
+            await interaction.reply(`${gamertag} has been added to the allowed admins.`);
+        } else if (subcommand === 'list') {
+            await interaction.reply(`Allowed Admins: ${[...allowedAdmins].join(', ') || 'None'}`);
+        } else if (subcommand === 'remove') {
+            allowedAdmins.delete(gamertag);
+            await interaction.reply(`${gamertag} has been removed from the allowed admins.`);
+        }
+    } else if (commandName === 'ban') {
+        const gamertag = options.getString('gamertag');
+        const duration = options.getInteger('duration');
+        await interaction.reply(`${gamertag} has been banned for ${duration} minutes.`);
+    } else if (commandName === 'serverstatus') {
+        try {
+            const response = await axios.get('https://your-ark-server-api.com/status');
+            await interaction.reply(`Server Status: ${response.data.status}`);
+        } catch (error) {
+            await interaction.reply('Failed to fetch server status.');
+        }
+    } else if (commandName === 'onlineplayers') {
+        await interaction.reply('Fetching online players...');
+    } else if (commandName === 'activate') {
+        const code = options.getString('code');
+        if (activationCodes.has(code)) {
+            activatedUsers.add(user.id);
+            activationCodes.delete(code);
+            await interaction.reply('Your account has been activated!');
+        } else {
+            await interaction.reply('Invalid activation code.');
+        }
+    } else if (commandName === 'generatecode') {
+        if (user.id !== process.env.OWNER_ID) {
+            return await interaction.reply('You do not have permission to generate activation codes.');
+        }
+        const code = crypto.randomBytes(8).toString('hex');
+        activationCodes.set(code, true);
+        await interaction.reply(`Generated activation code: \`${code}\``);
+    } else if (commandName === 'gtsearch') {
+        const gamertag = options.getString('gamertag');
+        await interaction.reply(`Searching for information on ${gamertag}...`);
+    } else if (commandName === 'playersearch') {
+        const player = options.getString('player');
+        await interaction.reply(`Searching for ${player}...`);
+    } else if (commandName === 'tribesearch') {
+        const tribe = options.getString('tribe');
+        await interaction.reply(`Searching for tribe ${tribe}...`);
+    } else if (commandName === 'tribeban') {
+        const tribe = options.getString('tribe');
+        await interaction.reply(`Banning entire tribe ${tribe}...`);
+    } else if (commandName === 'unban') {
+        const gamertag = options.getString('gamertag');
+        await interaction.reply(`Unbanning ${gamertag}...`);
+    } else if (commandName === 'serverpop') {
+        await interaction.reply('Fetching total player population across all linked servers...');
+    } else if (commandName === 'profile') {
+        await interaction.reply('Fetching profile details...');
+    } else if (commandName === 'review') {
+        await interaction.reply('Submitting review...');
+    } else if (commandName === 'rollback') {
+        await interaction.reply('Rolling back file...');
+    } else if (commandName === 'servermanagement') {
+        await interaction.reply('Managing server settings...');
+    } else if (commandName === 'setplayerlist') {
+        await interaction.reply('Setting player list channel...');
+    } else if (commandName === 'upload-file') {
+        await interaction.reply('Uploading file to Nitrado server...');
+    } else if (commandName === 'download-file') {
+        await interaction.reply('Downloading file from Nitrado server...');
+    } else if (commandName === 'movechannel') {
+        await interaction.reply('Moving channel to another category...');
+    } else if (commandName === 'changeadminpassword') {
+        await interaction.reply('Changing admin password on selected servers...');
+    }
+});
+
+client.login(process.env.BOT_TOKEN);
